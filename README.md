@@ -20,6 +20,7 @@ It exists to prove the plumbing works so real analyses and UI can be plugged in 
 | `app.py` | Flask backend: `/`, `/api/students`, `/api/skill-averages`, `POST /api/match`, `/health` |
 | `templates/index.html` | Frontend: name list + **Shuffle Names**, skill averages, and a form that sends user input to the backend model |
 | `Dockerfile` | `python:3.10-slim`; runs `gunicorn --bind 0.0.0.0:$PORT app:app` |
+| `hello.py` | Earlier Git/GitHub workflow exercise (each member added their name via a pull request) |
 | `.env.example` | Template for your local `.env` (the real `.env` is git-ignored) |
 
 ## Endpoints
