@@ -4,5 +4,5 @@ __pycache__/
 *.pyc
 .DS_Store
 
-# Class data stays local (classmates' personal info); load it with deploy_db.py
+# Old class survey (classmates' personal info) — never commit it
 class_dataset.csv

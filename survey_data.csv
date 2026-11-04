@@ -1,0 +1,13 @@
+Respondent #,Production Name,Respondent Role,Production Type,Role Hired,Ease of finding (1-10),Performance (1-10),Would hire again,Cancelled/flaked 24-48h (for anyone hired in this position),Shoot Days,Hours Per Day,Total Shoot Hours,Tisch Database,Instagram ISOs,Facebook Groups,Other Social Media,Backstage,Apps,Cold Email / Pitching,WOM / Peer Recommendations,Classmates,Already Know,Already Worked With
+R1,Lottie Baby,Executive Producer (EP),Independent Student Short Film,Director of Photography (DP),5,8,Y,Y,4,12,48,0,0,0,0,0,0,0,0,0,1,1
+R1,Lottie Baby,Executive Producer (EP),Independent Student Short Film,Colorist,8,9,Y,N,4,12,48,0,0,0,0,0,0,0,1,0,0,0
+R1,Lottie Baby,Executive Producer (EP),Independent Student Short Film,Van/Truck Driver,4,8,N,N,4,12,48,0,1,0,0,0,0,0,1,0,1,0
+R2,Margin of Innocence,"Writer, Director, Executive Producer (EP)",Advanced Production Workshop (Year-long) [Senior],Director of Photography (DP),3,10,Y,N,4,10,40,0,1,0,0,0,0,1,1,1,1,1
+R2,Margin of Innocence,"Writer, Director, Executive Producer (EP)",Advanced Production Workshop (Year-long) [Senior],Assistant Director (AD),7,10,Y,N,4,10,40,0,0,0,0,0,0,0,0,0,1,0
+R2,Margin of Innocence,"Writer, Director, Executive Producer (EP)",Advanced Production Workshop (Year-long) [Senior],Sound Mixer,2,3,N,N,4,10,40,0,1,1,0,0,0,0,1,1,0,0
+R3,Goldie,"Writer, Director, Producer",Sight & Sound: Filmmaking [Sophomore],Assistant Director (AD),9,10,Y,N,1,10,10,0,0,0,0,0,0,0,0,0,1,1
+R3,Goldie,"Writer, Director, Producer",Sight & Sound: Filmmaking [Sophomore],Director of Photography (DP),5,9,Y,N,1,10,10,0,0,0,0,0,0,0,0,0,1,1
+R3,Goldie,"Writer, Director, Producer",Sight & Sound: Filmmaking [Sophomore],1st Assistant Camera (AC),6,8,Y,N,1,10,10,0,0,0,0,0,0,0,0,1,1,1
+R4,Stephan's Computer Parts,Producer,Advanced Experimental Workshop Film [Senior],Art Director,7,9,Y,N,3,8,24,1,1,0,0,0,0,0,1,0,0,0
+R4,Stephan's Computer Parts,Producer,Advanced Experimental Workshop Film [Senior],Unit Production Manager (UPM),7,9,Y,N,3,8,24,1,1,0,0,0,0,0,0,0,0,0
+R4,Stephan's Computer Parts,Producer,Advanced Experimental Workshop Film [Senior],Assistant Director (AD),6,5,N,N,3,8,24,0,0,0,0,0,0,0,1,1,1,1

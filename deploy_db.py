@@ -1,8 +1,8 @@
-"""Create the schema and load class_dataset.csv into Postgres.
+"""Create the schema and load survey_data.csv into Postgres.
 
 Usage:
     python deploy_db.py              # rebuild tables and reload the CSV
-    python deploy_db.py --if-empty   # only load when the database has no students yet
+    python deploy_db.py --if-empty   # only load when the database has no hires yet (used on deploy)
 
 Reads DATABASE_URL from the environment (or from a local .env file).
 """
@@ -15,18 +15,15 @@ import psycopg2
 from dotenv import load_dotenv
 
 HERE = Path(__file__).resolve().parent
-CSV_PATH = HERE / "class_dataset.csv"
+CSV_PATH = HERE / "survey_data.csv"
 SCHEMA_PATH = HERE / "schema.sql"
 
-
-def split_multi(value):
-    """'Python; SQL; Excel' -> ['Python', 'SQL', 'Excel'] (trimmed, de-duplicated, order kept)."""
-    seen = []
-    for part in (value or "").split(";"):
-        part = part.strip()
-        if part and part not in seen:
-            seen.append(part)
-    return seen
+# The 0/1 columns in the CSV that say where the hire was found.
+CHANNEL_COLUMNS = [
+    "Tisch Database", "Instagram ISOs", "Facebook Groups", "Other Social Media", "Backstage", "Apps",
+    "Cold Email / Pitching", "WOM / Peer Recommendations", "Classmates", "Already Know", "Already Worked With",
+]
+FLAKE_COLUMN = "Cancelled/flaked 24-48h (for anyone hired in this position)"
 
 
 def to_int(value):
@@ -34,12 +31,24 @@ def to_int(value):
     return int(value) if value.isdigit() else None
 
 
-def students_exist(cur):
-    cur.execute("SELECT to_regclass('public.students')")
+def to_bool(value):
+    value = (value or "").strip().upper()
+    return {"Y": True, "YES": True, "N": False, "NO": False}.get(value)
+
+
+def hires_exist(cur):
+    cur.execute("SELECT to_regclass('public.hires')")
     if cur.fetchone()[0] is None:
         return False
-    cur.execute("SELECT COUNT(*) FROM students")
+    cur.execute("SELECT COUNT(*) FROM hires")
     return cur.fetchone()[0] > 0
+
+
+def get_or_create(cur, cache, table, id_col, name_col, name):
+    if name not in cache:
+        cur.execute(f"INSERT INTO {table} ({name_col}) VALUES (%s) RETURNING {id_col}", (name,))
+        cache[name] = cur.fetchone()[0]
+    return cache[name]
 
 
 def load(conn):
@@ -49,43 +58,52 @@ def load(conn):
         with CSV_PATH.open(newline="", encoding="utf-8-sig") as f:
             rows = list(csv.DictReader(f))
 
-        tool_ids, slot_ids = {}, {}
+        # Channels get ids in CSV column order so the lookup table reads naturally.
+        channel_ids, role_ids, production_ids = {}, {}, {}
+        for name in CHANNEL_COLUMNS:
+            get_or_create(cur, channel_ids, "sourcing_channels", "channel_id", "channel_name", name)
+
         for row in rows:
+            prod_name = row["Production Name"].strip()
+            if prod_name not in production_ids:
+                cur.execute(
+                    """
+                    INSERT INTO productions (name, production_type, respondent_code, respondent_role,
+                                             shoot_days, hours_per_day, total_shoot_hours)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING production_id
+                    """,
+                    (
+                        prod_name, row["Production Type"].strip(), row["Respondent #"].strip(),
+                        row["Respondent Role"].strip(), to_int(row["Shoot Days"]),
+                        to_int(row["Hours Per Day"]), to_int(row["Total Shoot Hours"]),
+                    ),
+                )
+                production_ids[prod_name] = cur.fetchone()[0]
+
+            role_id = get_or_create(cur, role_ids, "crew_roles", "role_id", "role_name", row["Role Hired"].strip())
             cur.execute(
                 """
-                INSERT INTO students (netid, name, school_year, intro_programming,
-                    skill_programming, skill_data_stats, skill_frontend_design, skill_business_pitch,
-                    working_style, interests, semester_goal, submitted_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULLIF(%s, '')::timestamptz)
-                RETURNING student_id
+                INSERT INTO hires (production_id, role_id, ease_of_finding, performance,
+                                   would_hire_again, flaked_24_48h)
+                VALUES (%s, %s, %s, %s, %s, %s) RETURNING hire_id
                 """,
                 (
-                    row["netid"].strip(), row["name"].strip(), row["school_year"].strip() or None,
-                    row["intro_programming"].strip() or None,
-                    to_int(row["skill_programming"]), to_int(row["skill_data_stats"]),
-                    to_int(row["skill_frontend_design"]), to_int(row["skill_business_pitch"]),
-                    row["working_style"], row["interests"], row["semester_goal"], row["submitted_at"].strip(),
+                    production_ids[prod_name], role_id, to_int(row["Ease of finding (1-10)"]),
+                    to_int(row["Performance (1-10)"]), to_bool(row["Would hire again"]),
+                    to_bool(row[FLAKE_COLUMN]),
                 ),
             )
-            student_id = cur.fetchone()[0]
+            hire_id = cur.fetchone()[0]
 
-            for tool in split_multi(row["tools"]):
-                if tool not in tool_ids:
-                    cur.execute("INSERT INTO tools (tool_name) VALUES (%s) RETURNING tool_id", (tool,))
-                    tool_ids[tool] = cur.fetchone()[0]
-                cur.execute("INSERT INTO student_tools VALUES (%s, %s)", (student_id, tool_ids[tool]))
-
-            for slot in split_multi(row["availability"]):
-                if slot not in slot_ids:
-                    cur.execute("INSERT INTO availability_slots (slot_label) VALUES (%s) RETURNING slot_id", (slot,))
-                    slot_ids[slot] = cur.fetchone()[0]
-                cur.execute("INSERT INTO student_availability VALUES (%s, %s)", (student_id, slot_ids[slot]))
+            for name in CHANNEL_COLUMNS:
+                if to_int(row.get(name)) == 1:
+                    cur.execute("INSERT INTO hire_channels VALUES (%s, %s)", (hire_id, channel_ids[name]))
 
         conn.commit()
 
-        for table in ("students", "tools", "availability_slots", "student_tools", "student_availability"):
+        for table in ("productions", "crew_roles", "sourcing_channels", "hires", "hire_channels"):
             cur.execute(f"SELECT COUNT(*) FROM {table}")
-            print(f"{table:22s} {cur.fetchone()[0]:>4d} rows")
+            print(f"{table:18s} {cur.fetchone()[0]:>4d} rows")
 
 
 def main():
@@ -97,8 +115,8 @@ def main():
     try:
         if "--if-empty" in sys.argv:
             with conn.cursor() as cur:
-                if students_exist(cur):
-                    print("Database already has students; skipping load.")
+                if hires_exist(cur):
+                    print("Database already has survey data; skipping load.")
                     return
         load(conn)
     finally:

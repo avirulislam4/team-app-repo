@@ -1,12 +1,15 @@
 """Team app skeleton: browser (HTML/JS) -> Flask (this file) -> Postgres.
 
+Data: our crew-hiring survey (survey_data.csv) — producers rating the crew they hired.
+
 Routes
-  GET  /                    the page (templates/index.html)
-  GET  /api/students        student names from Postgres
-  GET  /api/skill-averages  "model" #1: average of the four skill ratings (computed in SQL)
-  POST /api/match           "model" #2: takes user input (your four skill ratings) and returns
-                            the classmates who best complement you — placeholder model logic
-  GET  /health              liveness check (also confirms the database answers)
+  GET  /                   the page (templates/index.html)
+  GET  /api/productions    productions in the database
+  GET  /api/roles          crew roles (fills the dropdown on the page)
+  GET  /api/role-stats     "model" #1: per-role averages computed in SQL
+  POST /api/recommend      "model" #2: takes user input (a crew role) and returns which
+                           sourcing channels found the best hires for it — placeholder logic
+  GET  /health             liveness check (also confirms the database answers)
 """
 import os
 
@@ -18,7 +21,6 @@ from flask import Flask, jsonify, render_template, request
 load_dotenv()  # local development only; on Railway the variable comes from the Variables tab
 
 app = Flask(__name__)
-SKILLS = ["skill_programming", "skill_data_stats", "skill_frontend_design", "skill_business_pitch"]
 
 
 def get_conn():
@@ -34,65 +36,95 @@ def query(sql, params=None):
         return cur.fetchall()
 
 
+def numeric(rows):
+    """Postgres ROUND() returns Decimal; make every row JSON-friendly."""
+    return [{k: (float(v) if hasattr(v, "as_tuple") else v) for k, v in r.items()} for r in rows]
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
 
-@app.route("/api/students")
-def students():
-    rows = query("SELECT name FROM students ORDER BY name")
-    return jsonify([r["name"] for r in rows])
-
-
-@app.route("/api/skill-averages")
-def skill_averages():
-    row = query(
+@app.route("/api/productions")
+def productions():
+    rows = query(
         """
-        SELECT ROUND(AVG(skill_programming)::numeric, 2)     AS programming,
-               ROUND(AVG(skill_data_stats)::numeric, 2)      AS data_stats,
-               ROUND(AVG(skill_frontend_design)::numeric, 2) AS frontend_design,
-               ROUND(AVG(skill_business_pitch)::numeric, 2)  AS business_pitch,
-               COUNT(*)                                      AS n
-        FROM students
+        SELECT p.name, p.production_type, p.respondent_role, p.shoot_days, p.total_shoot_hours,
+               COUNT(h.hire_id) AS positions_rated
+        FROM productions p
+        LEFT JOIN hires h ON h.production_id = p.production_id
+        GROUP BY p.production_id
+        ORDER BY p.name
         """
-    )[0]
-    return jsonify({k: float(v) if k != "n" else int(v) for k, v in row.items()})
+    )
+    return jsonify(rows)
 
 
-@app.route("/api/match", methods=["POST"])
-def match():
-    """Placeholder model: score each classmate by how much they add where you are weaker.
+@app.route("/api/roles")
+def roles():
+    return jsonify([r["role_name"] for r in query("SELECT role_name FROM crew_roles ORDER BY role_name")])
 
-    complement score = sum over skills of max(0, their_rating - your_rating)
+
+@app.route("/api/role-stats")
+def role_stats():
+    rows = query(
+        """
+        SELECT r.role_name,
+               COUNT(*)                                                     AS hires,
+               ROUND(AVG(h.ease_of_finding)::numeric, 1)                    AS avg_ease,
+               ROUND(AVG(h.performance)::numeric, 1)                        AS avg_performance,
+               ROUND(100.0 * AVG(CASE WHEN h.would_hire_again THEN 1 ELSE 0 END), 0) AS rehire_pct,
+               ROUND(100.0 * AVG(CASE WHEN h.flaked_24_48h   THEN 1 ELSE 0 END), 0) AS flake_pct
+        FROM hires h
+        JOIN crew_roles r ON r.role_id = h.role_id
+        GROUP BY r.role_name
+        ORDER BY avg_ease, r.role_name          -- hardest-to-find roles first
+        """
+    )
+    return jsonify(numeric(rows))
+
+
+@app.route("/api/recommend", methods=["POST"])
+def recommend():
+    """Placeholder model: for the chosen role, rank sourcing channels by the hires they produced.
+
+    score = average performance of hires found through the channel (ties -> more hires first)
     Swap this function out for the real analysis later; the request/response shape stays the same.
     """
     data = request.get_json(silent=True) or {}
-    try:
-        mine = [int(data.get(k, 3)) for k in ("programming", "data_stats", "frontend_design", "business_pitch")]
-    except (TypeError, ValueError):
-        return jsonify({"error": "ratings must be whole numbers 1-5"}), 400
-    if not all(1 <= v <= 5 for v in mine):
-        return jsonify({"error": "ratings must be between 1 and 5"}), 400
+    role = (data.get("role") or "").strip()
+    found = query("SELECT role_id FROM crew_roles WHERE role_name = %s", (role,))
+    if not found:
+        return jsonify({"error": "unknown role — pick one from the list"}), 400
+    role_id = found[0]["role_id"]
 
-    rows = query(
-        f"""
-        SELECT s.name, {", ".join("s." + k for k in SKILLS)},
-               GREATEST(s.skill_programming     - %s, 0)
-             + GREATEST(s.skill_data_stats      - %s, 0)
-             + GREATEST(s.skill_frontend_design - %s, 0)
-             + GREATEST(s.skill_business_pitch  - %s, 0) AS complement_score,
-               COALESCE(STRING_AGG(DISTINCT t.tool_name, ', '), '') AS tools
-        FROM students s
-        LEFT JOIN student_tools st ON st.student_id = s.student_id
-        LEFT JOIN tools t ON t.tool_id = st.tool_id
-        GROUP BY s.student_id
-        ORDER BY complement_score DESC, s.name
-        LIMIT 3
+    summary = numeric(query(
+        """
+        SELECT COUNT(*) AS hires,
+               ROUND(AVG(ease_of_finding)::numeric, 1) AS avg_ease,
+               ROUND(AVG(performance)::numeric, 1)     AS avg_performance
+        FROM hires WHERE role_id = %s
         """,
-        mine,
-    )
-    return jsonify(rows)
+        (role_id,),
+    ))[0]
+    channels = numeric(query(
+        """
+        SELECT c.channel_name,
+               COUNT(*)                                  AS hires,
+               ROUND(AVG(h.performance)::numeric, 1)     AS avg_performance,
+               ROUND(AVG(h.ease_of_finding)::numeric, 1) AS avg_ease,
+               BOOL_AND(h.would_hire_again)              AS always_rehired
+        FROM hires h
+        JOIN hire_channels hc ON hc.hire_id = h.hire_id
+        JOIN sourcing_channels c ON c.channel_id = hc.channel_id
+        WHERE h.role_id = %s
+        GROUP BY c.channel_name
+        ORDER BY avg_performance DESC, hires DESC, c.channel_name
+        """,
+        (role_id,),
+    ))
+    return jsonify({"role": role, "summary": summary, "channels": channels})
 
 
 @app.route("/health")

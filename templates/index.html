@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Team App Skeleton</title>
+  <title>Crew Hiring App Skeleton</title>
   <style>
     :root { --ink:#1d2433; --muted:#5b6475; --line:#e3e6ec; --accent:#57068c; --bg:#f7f7fa; }
     * { box-sizing:border-box; }
@@ -11,114 +11,104 @@
     header { background:var(--accent); color:#fff; padding:20px 16px; }
     header h1 { margin:0; font-size:1.4rem; }
     header p { margin:4px 0 0; opacity:.85; font-size:.9rem; }
-    main { max-width:960px; margin:0 auto; padding:16px; display:grid; gap:16px; grid-template-columns:1fr; }
-    @media (min-width:800px) { main { grid-template-columns:1fr 1fr; } .wide { grid-column:1 / -1; } }
-    section { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; }
+    main { max-width:1000px; margin:0 auto; padding:16px; display:grid; gap:16px; }
+    section { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; overflow-x:auto; }
     h2 { margin:0 0 10px; font-size:1.05rem; }
     .hint { color:var(--muted); font-size:.85rem; margin:0 0 12px; }
-    button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:8px 14px; font-size:.9rem; cursor:pointer; }
+    button, select { font-size:.9rem; border-radius:6px; padding:8px 12px; }
+    button { background:var(--accent); color:#fff; border:0; cursor:pointer; }
     button:hover { opacity:.9; }
-    ul#names { columns:2; padding-left:18px; margin:12px 0 0; }
-    ul#names li { margin:2px 0; }
-    .stats { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
-    .stat { border:1px solid var(--line); border-radius:8px; padding:10px; }
-    .stat b { display:block; font-size:1.4rem; }
-    .stat span { color:var(--muted); font-size:.8rem; }
-    label { display:grid; grid-template-columns:150px 1fr 1.5em; align-items:center; gap:10px; margin:6px 0; font-size:.9rem; }
-    input[type=range] { width:100%; }
-    output { width:1.2em; text-align:right; font-weight:600; }
-    table { width:100%; border-collapse:collapse; margin-top:12px; font-size:.88rem; }
-    th, td { text-align:left; padding:6px; border-bottom:1px solid var(--line); }
+    select { border:1px solid var(--line); min-width:260px; max-width:100%; }
+    form { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    table { width:100%; border-collapse:collapse; font-size:.88rem; }
+    th, td { text-align:left; padding:6px; border-bottom:1px solid var(--line); vertical-align:top; }
+    .summary { margin:12px 0 4px; font-size:.9rem; }
     .err { color:#b00020; }
     footer { text-align:center; color:var(--muted); font-size:.8rem; padding:16px; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Team App Skeleton</h1>
-    <p>Browser (HTML + JavaScript) → Flask backend → Postgres on Railway</p>
+    <h1>Crew Hiring — App Skeleton</h1>
+    <p>Browser (HTML + JavaScript) → Flask backend → Postgres on Railway · data: our producer survey</p>
   </header>
 
   <main>
     <section>
-      <h2>Students in the database</h2>
-      <p class="hint">Loaded from <code>/api/students</code>. Shuffle runs in your browser and never calls the database.</p>
-      <button id="shuffle">Shuffle Names</button>
-      <ul id="names"><li>Loading…</li></ul>
+      <h2>Productions in the database</h2>
+      <p class="hint">Loaded from <code>/api/productions</code> (backend → database). Shuffle runs in your browser only.</p>
+      <button id="shuffle">Shuffle</button>
+      <div id="productions" style="margin-top:12px">Loading…</div>
     </section>
 
     <section>
-      <h2>Average skill ratings (model output)</h2>
-      <p class="hint">Computed in SQL with <code>AVG()</code> over every row in <code>students</code> — <code>/api/skill-averages</code>.</p>
-      <div class="stats" id="averages">Loading…</div>
+      <h2>Crew roles at a glance (model output)</h2>
+      <p class="hint">Averages computed in SQL over every hire — <code>/api/role-stats</code>. Hardest-to-find roles first.</p>
+      <div id="roleStats">Loading…</div>
     </section>
 
-    <section class="wide">
-      <h2>Find a complementary teammate (user input → model → database)</h2>
-      <p class="hint">Rate yourself 1–5. The page sends your ratings to <code>POST /api/match</code>; the backend scores every classmate in Postgres and returns the three who add most where you are weaker. Placeholder logic to swap for the real analysis.</p>
-      <form id="matchForm">
-        <label>Programming <input type="range" min="1" max="5" value="3" name="programming"><output>3</output></label>
-        <label>Data &amp; stats <input type="range" min="1" max="5" value="3" name="data_stats"><output>3</output></label>
-        <label>Frontend &amp; design <input type="range" min="1" max="5" value="3" name="frontend_design"><output>3</output></label>
-        <label>Business &amp; pitch <input type="range" min="1" max="5" value="3" name="business_pitch"><output>3</output></label>
-        <button type="submit">Find matches</button>
+    <section>
+      <h2>Where should I look for this role? (user input → model → database)</h2>
+      <p class="hint">Pick a crew role. The page sends it to <code>POST /api/recommend</code>; the backend queries every hire for that role and ranks the sourcing channels by how well those hires performed. Placeholder logic to swap for the real analysis.</p>
+      <form id="recForm">
+        <select id="role" name="role" aria-label="Crew role"><option>Loading roles…</option></select>
+        <button type="submit">Recommend channels</button>
       </form>
-      <div id="matches"></div>
+      <div id="rec"></div>
     </section>
   </main>
 
-  <footer>TECH-UB 24 · Team: Karen, Nicholas, Avirul, Adriana · app skeleton</footer>
+  <footer>TECH-UB 24 · Group 7: Karen, Nicholas, Avirul, Adriana · app skeleton</footer>
 
   <script>
-    const namesEl = document.getElementById('names');
-    let names = [];
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const table = (heads, rows) => '<table><thead><tr>' + heads.map(h => `<th>${h}</th>`).join('') +
+      '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+    const getJSON = url => fetch(url).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
 
-    function renderNames() {
-      namesEl.innerHTML = '';
-      names.forEach(n => { const li = document.createElement('li'); li.textContent = n; namesEl.appendChild(li); });
+    // 1) backend -> database: productions list (+ client-side shuffle)
+    let prods = [];
+    function renderProds() {
+      document.getElementById('productions').innerHTML = table(
+        ['Production', 'Type', 'Respondent role', 'Shoot days', 'Total hours', 'Positions rated'],
+        prods.map(p => [esc(p.name), esc(p.production_type), esc(p.respondent_role),
+                        p.shoot_days, p.total_shoot_hours, p.positions_rated]));
     }
+    document.getElementById('shuffle').addEventListener('click', () => {
+      for (let i = prods.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [prods[i], prods[j]] = [prods[j], prods[i]]; }
+      renderProds();
+    });
+    getJSON('/api/productions').then(d => { prods = d; renderProds(); })
+      .catch(e => document.getElementById('productions').innerHTML = `<p class="err">Could not load: ${esc(e.message)}</p>`);
 
-    function shuffle(arr) {               // Fisher–Yates, entirely in the browser
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-    }
+    // 2) model computed in SQL
+    getJSON('/api/role-stats').then(rows => {
+      document.getElementById('roleStats').innerHTML = table(
+        ['Role', 'Hires', 'Ease of finding (1–10)', 'Performance (1–10)', 'Would hire again', 'Flaked 24–48h'],
+        rows.map(r => [esc(r.role_name), r.hires, r.avg_ease, r.avg_performance, r.rehire_pct + '%', r.flake_pct + '%']));
+    }).catch(e => document.getElementById('roleStats').innerHTML = `<p class="err">${esc(e.message)}</p>`);
 
-    document.getElementById('shuffle').addEventListener('click', () => { shuffle(names); renderNames(); });
-
-    fetch('/api/students')
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(data => { names = data; renderNames(); })
-      .catch(e => { namesEl.innerHTML = '<li class="err">Could not load names: ' + e.message + '</li>'; });
-
-    const labels = { programming: 'Programming', data_stats: 'Data & stats', frontend_design: 'Frontend & design', business_pitch: 'Business & pitch' };
-    fetch('/api/skill-averages')
-      .then(r => r.json())
-      .then(a => {
-        document.getElementById('averages').innerHTML = Object.keys(labels)
-          .map(k => `<div class="stat"><b>${a[k].toFixed(2)}</b><span>${labels[k]}</span></div>`).join('') +
-          `<div class="stat"><b>${a.n}</b><span>Students</span></div>`;
-      })
-      .catch(e => { document.getElementById('averages').innerHTML = '<span class="err">' + e.message + '</span>'; });
-
-    document.querySelectorAll('input[type=range]').forEach(el =>
-      el.addEventListener('input', () => { el.nextElementSibling.value = el.value; }));
-
-    document.getElementById('matchForm').addEventListener('submit', async (ev) => {
+    // 3) user input -> model -> database
+    getJSON('/api/roles').then(roles => {
+      document.getElementById('role').innerHTML = roles.map(r => `<option>${esc(r)}</option>`).join('');
+    });
+    document.getElementById('recForm').addEventListener('submit', async ev => {
       ev.preventDefault();
-      const body = Object.fromEntries(new FormData(ev.target).entries());
-      const out = document.getElementById('matches');
+      const out = document.getElementById('rec');
       out.textContent = 'Scoring…';
       try {
-        const r = await fetch('/api/match', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const rows = await r.json();
-        if (!r.ok) throw new Error(rows.error || ('HTTP ' + r.status));
-        out.innerHTML = '<table><thead><tr><th>Classmate</th><th>Prog.</th><th>Data</th><th>Front.</th><th>Pitch</th><th>Adds</th><th>Tools</th></tr></thead><tbody>' +
-          rows.map(s => `<tr><td>${s.name}</td><td>${s.skill_programming}</td><td>${s.skill_data_stats}</td><td>${s.skill_frontend_design}</td><td>${s.skill_business_pitch}</td><td><b>+${s.complement_score}</b></td><td>${s.tools}</td></tr>`).join('') +
-          '</tbody></table>';
+        const r = await fetch('/api/recommend', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                   body: JSON.stringify({ role: document.getElementById('role').value }) });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+        const s = d.summary;
+        out.innerHTML = `<p class="summary"><b>${esc(d.role)}</b>: ${s.hires} hire(s) in the survey · ease of finding ${s.avg_ease}/10 · performance ${s.avg_performance}/10</p>` +
+          (d.channels.length
+            ? table(['Sourcing channel', 'Hires found', 'Avg performance', 'Avg ease', 'All rehired?'],
+                    d.channels.map(c => [esc(c.channel_name), c.hires, c.avg_performance, c.avg_ease, c.always_rehired ? 'Yes' : 'No']))
+            : '<p class="hint">No sourcing channel was recorded for this role.</p>');
       } catch (e) {
-        out.innerHTML = '<p class="err">' + e.message + '</p>';
+        out.innerHTML = `<p class="err">${esc(e.message)}</p>`;
       }
     });
   </script>
