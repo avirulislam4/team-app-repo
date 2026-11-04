@@ -1,0 +1,8 @@
+.env
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Class data stays local (classmates' personal info); load it with deploy_db.py
+class_dataset.csv
